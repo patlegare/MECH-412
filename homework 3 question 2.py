@@ -25,12 +25,12 @@ P=ct.tf([A/(R_1*C),0],[1,(R_1+R_2)/(R_1*R_2*C),(A**2)/(m*C)])
 #Testing difference equation using zero order hold
 T=0.01 #sample period
 Pd=P.sample(T,method='zoh')
-print(Pd)
+print("Zero-Order Hold Discretized Model:",Pd)
 
 # %%
 # A demo on how to use d2c. You will need to use this to go from your DT IDed model to a CT IDed model.
 # Pd is a first oder, DT transfer function.
-Pd = control.tf(0.09516, np.array([1, -0.9048]), 0.01)
+Pd = ct.tf(0.09516, np.array([1, -0.9048]), 0.01)
 # Using the custom command d2c.d2c convert Pd to Pc where Pc is a CT transfer function.
 Pc = d2c.d2c(Pd)
 print(Pd, Pc)
@@ -44,6 +44,7 @@ plt.rc('axes', grid=True)
 plt.rc('grid', linestyle='--')
 
 # %% 
+import numpy as np
 # Read in input-output (IO) data
 data_read = np.loadtxt('IO_data.csv',
                         dtype=float,
@@ -51,7 +52,7 @@ data_read = np.loadtxt('IO_data.csv',
                         skiprows=1,
                         usecols=(0, 1, 2))
 
-# print(data_read)  # print the data, just to get a feel for the data.
+print(data_read)  # print the data, just to get a feel for the data.
 
 # Extract time
 t = data_read[:, 0]
@@ -65,9 +66,30 @@ y = data_read[:, 2]
 # %% 
 # System ID
 
-# Form the A and b matrix. (You might want create a function to form A and b given u and y.)
+# Form the A and b matrix.
+def build_A_b(u, y):
+    N = len(y)
+    rows = N - 2
+    A = np.zeros((rows, 4))
+    b = np.zeros(rows)
+    for k in range(rows):
+        # Model: y[k+2] + a1*y[k+1] + a0*y[k] = b1*u[k+1] + b0*u[k]
+        A[k, :] = [-y[k+1], -y[k], u[k+1], u[k]]
+        b[k] = y[k+2]
+    return A, b
 
-# Is the A matrix "good"? How can you check?
+# Form A and b
+A, b = build_A_b(u, y)
+
+# Check conditioning
+cond_A = np.linalg.cond(A.T @ A)
+print("Condition number of A =", cond_A)
+
+# Solve least squares: A x = b
+x, residuals, rank, svals = np.linalg.lstsq(A, b, rcond=None)
+a1, a0, b1, b0 = x
+print("\nEstimated parameter vector x = [a1, a0, b1, b0]^T")
+print(x, "\n")
 
 # Solve for x.
 n = 1 # You change. 
@@ -108,7 +130,7 @@ print('The continuous-time TF is,', Pc_ID)
 
 # %% 
 # Response of DT IDed system to (training) input data
-td_ID_train, yd_ID_train = control.forced_response(Pd_ID, t, u)
+td_ID_train, yd_ID_train = ct.forced_response(Pd_ID, t, u)
 
 # Plot training data
 fig, ax = plt.subplots(2, 1)   
