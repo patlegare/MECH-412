@@ -6,11 +6,26 @@ J R Forbes, 2025/10/02
 # %%
 # Libraries
 import numpy as np
-import control
+import control as ct
 from matplotlib import pyplot as plt
 
 # Custom libraries 
 import d2c
+
+#Model Parameters
+R_1=12000000 #Pa*s/m^3
+R_2=105000000 #Pa*s/m^3
+C=4.5*10**-9 #m^3/Pa
+m=8 #kg
+A=np.pi*(0.15/2)**2 #m^2
+
+#Transfer Function
+P=ct.tf([A/(R_1*C),0],[1,(R_1+R_2)/(R_1*R_2*C),(A**2)/(m*C)])
+
+#Testing difference equation using zero order hold
+T=0.01 #sample period
+Pd=P.sample(T,method='zoh')
+print(Pd)
 
 # %%
 # A demo on how to use d2c. You will need to use this to go from your DT IDed model to a CT IDed model.
