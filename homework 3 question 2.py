@@ -27,14 +27,6 @@ T=0.01 #sample period
 Pd=P.sample(T,method='zoh')
 print("Zero-Order Hold Discretized Model:",Pd)
 
-# %%
-# A demo on how to use d2c. You will need to use this to go from your DT IDed model to a CT IDed model.
-# Pd is a first oder, DT transfer function.
-Pd = ct.tf(0.09516, np.array([1, -0.9048]), 0.01)
-# Using the custom command d2c.d2c convert Pd to Pc where Pc is a CT transfer function.
-Pc = d2c.d2c(Pd)
-print(Pd, Pc)
-
 # %% 
 # Plotting parameters
 # plt.rc('text', usetex=True)
@@ -130,14 +122,12 @@ print('The NMSE is', NMSE, '\n')
 # Compute TF 
 # Extract denominator and numerator coefficients.
 n=2
-N_x = x.shape[0]
+x=x_unnormalized
 Pd_ID_den = np.hstack([1, x[0:n, :].reshape(-1,)])  # denominator coefficients of DT TF
 Pd_ID_num = x[n:, :].reshape(-1,)  # numerator coefficients of DT TF
 
 # Compute DT TF (and remember to ``undo" the normalization).
-u_bar = 1  # You change.
-y_bar = 1  # You change.
-Pd_ID = y_bar / u_bar * ct.tf(Pd_ID_num, Pd_ID_den, T)
+Pd_ID = ct.tf(Pd_ID_num, Pd_ID_den, T)
 print('The discrete-time TF is,', Pd_ID)
 
 # Compute the CT TF
@@ -186,23 +176,30 @@ y_test = data_read[:, 2]
 # Compute various error metrics
 
 # Form the A and b matrix using test data.
+u_bar_test = np.max(np.abs(u_test))
+y_bar_test = np.max(np.abs(y_test))
+un_test = u_test / u_bar_test
+yn_test = y_test / y_bar_test
+A_test, b_test = build_A_b(un_test, yn_test)
 
 # Compute the MSE, MSO, NMSE using test data
-MSE_test, MSO_test, NMSE_test = 0, 0, 0  # You change.
-
+e_test_vec = b_test - (A_test @ x_n)
+MSE_test = np.mean(e_test_vec**2)
+MSO_test = np.mean(b_test**2)
+NMSE_test = MSE_test / MSO_test
 # Error associated with Ax = b
 print('The MSE in test is', MSE_test)
 print('The MSO in test is', MSO_test)
 print('The NMSE in test is', NMSE_test, '\n')
 
 # Forced response of IDed system using test data
-td_ID_test, yd_ID_test = control.forced_response(Pd_ID, t_test, u_test)
+td_ID_test, yd_ID_test = ct.forced_response(Pd_ID, t_test, u_test)
 
 # Compute error
 e = yd_ID_test  - y_test
 
 # Compute %VAF
-VAF_test = 0  # you change
+VAF_test = (1 - np.var(e)/np.var(y_test)) * 100
 print('The %VAF is', VAF_test)
 
 # Compute and plot errors
