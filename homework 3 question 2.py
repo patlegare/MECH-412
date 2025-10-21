@@ -13,8 +13,8 @@ from matplotlib import pyplot as plt
 import d2c
 
 #Model Parameters
-R_1=12000000 #Pa*s/m^3
-R_2=105000000 #Pa*s/m^3
+R_1=120_000_00 #Pa*s/m^3
+R_2=105_000_000 #Pa*s/m^3
 C=4.5*10**-9 #m^3/Pa
 m=8 #kg
 A=np.pi*(0.15/2)**2 #m^2
@@ -63,49 +63,64 @@ T = t[1] - t[0]
 u = data_read[:, 1]
 y = data_read[:, 2]
 
-# %% 
-# System ID
+#normalize the data 
+u_bar = np.max(np.abs(u))
+y_bar = np.max(np.abs(y))
+un = u / u_bar
+yn = y / y_bar
 
+# System ID
 # Form the A and b matrix.
-def build_A_b(u, y):
-    N = len(y)
+def build_A_b(u_seq, y_seq):
+    N = len(y_seq)
     rows = N - 2
     A = np.zeros((rows, 4))
     b = np.zeros(rows)
     for k in range(rows):
         # Model: y[k+2] + a1*y[k+1] + a0*y[k] = b1*u[k+1] + b0*u[k]
-        A[k, :] = [-y[k+1], -y[k], u[k+1], u[k]]
-        b[k] = y[k+2]
+        A[k, :] = [-y_seq[k+1], -y_seq[k], u_seq[k+1], u_seq[k]]
+        b[k] = y_seq[k+2]
     return A, b
 
 # Form A and b
-A, b = build_A_b(u, y)
+A_n, b_n = build_A_b(un, yn)
 
 # Check conditioning
-cond_A = np.linalg.cond(A.T @ A)
-print("Condition number of A =", cond_A)
+U, S, Vt = np.linalg.svd(A_n, full_matrices=False)
+smin = S[-1]
+cond_A = np.inf if smin < np.finfo(float).eps else S[0] / smin
+print(f"Condition number cond2(A) via SVD = {cond_A}")
 
 # Solve least squares: A x = b
-x, residuals, rank, svals = np.linalg.lstsq(A, b, rcond=None)
-a1, a0, b1, b0 = x
-print("\nEstimated parameter vector x = [a1, a0, b1, b0]^T")
-print(x, "\n")
+x_n, residuals, rank, svals = np.linalg.lstsq(A_n, b_n, rcond=None)
+a1, a0, b1_n, b0_n = x_n
 
-# Solve for x.
-n = 1 # You change. 
-m = 0  # You change.
-x = np.array([[-0.9048, 0.09516]]).T  # Placeholder. You need to solve for x.
-print('The parameter estimates are\n', x,'\n')
+
+#rescale
+b1 = b1_n * (y_bar / u_bar)
+b0 = b0_n * (y_bar / u_bar)
+x_normalized = np.array([[a1], [a0], [b1_n], [b0_n]])
+x_unnormalized = np.array([[a1], [a0], [b1], [b0]])
+
+#Estimated parameters 
+print("\nEstimated parameter vector (normalized) x  = [a1, a0, b1, b0]^T")
+print(x_normalized, "\n")
+print("\nEstimated parameter vector (unnormalized) x = [a1, a0, b1, b0]^T")
+print(x_unnormalized, "\n")
+
 
 # Compute the uncertainty and relative uncertainty. 
-sigma = 0  # You change.
-rel_unc = 0  # You change.
+sigma = np.std(b_n-(A_n @ x_n))
+rel_unc = (sigma/np.mean(np.abs(b_n)))*100  
 
 print('The standard deviation is', sigma)
 print('The relative uncertainty is', rel_unc, '%\n')
 
 # Compute the MSE, MSO, NMSE.
-MSE, MSO, NMSE = 0, 0, 0  # You change.
+e=b_n-(A_n @ x_n) #residual error between measurements and predictions
+MSE= np.mean(e**2)
+MSO= np.mean(b_n**2)
+NMSE= MSE/MSO
 
 print('The MSE is', MSE)
 print('The MSO is', MSO)
@@ -114,6 +129,7 @@ print('The NMSE is', NMSE, '\n')
 # %% 
 # Compute TF 
 # Extract denominator and numerator coefficients.
+n=2
 N_x = x.shape[0]
 Pd_ID_den = np.hstack([1, x[0:n, :].reshape(-1,)])  # denominator coefficients of DT TF
 Pd_ID_num = x[n:, :].reshape(-1,)  # numerator coefficients of DT TF
@@ -121,7 +137,7 @@ Pd_ID_num = x[n:, :].reshape(-1,)  # numerator coefficients of DT TF
 # Compute DT TF (and remember to ``undo" the normalization).
 u_bar = 1  # You change.
 y_bar = 1  # You change.
-Pd_ID = y_bar / u_bar * control.tf(Pd_ID_num, Pd_ID_den, T)
+Pd_ID = y_bar / u_bar * ct.tf(Pd_ID_num, Pd_ID_den, T)
 print('The discrete-time TF is,', Pd_ID)
 
 # Compute the CT TF
