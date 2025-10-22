@@ -1,0 +1,58 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import control as ct
+
+#transfer functions
+G1 = ct.tf([1, 1], [1, 1, 1])
+G2 = ct.tf([8, 42, 140, 138], [1, 6, 28, 74, 51])
+G3 = ct.tf([1], [1, -2, 3, -2])
+G4 = ct.tf([1, 2], [1, 0.5, 0.5, 0.25, 0])
+
+systems= [G1, G2, G3, G4]
+names= ["(i) G1(s)", "(ii) G2(s)", "(iii) G3(s)", "(iv) G4(s)"]
+
+#bibo stability
+def bibo_verdict(sys):
+    poles = ct.poles(sys)
+    if np.any(np.real(poles) > 0): #Checks if real part is bigger than 0 (CRHP)
+        return "not BIBO stable (pole in ORHP)"
+    if np.any(np.isclose(np.real(poles), 0.0, atol=1e-10)): #Checks if real part is on imaginary axis
+            #atol to be robust to round-off error
+        return "NOT BIBO stable (pole on imaginary axis)"
+    return "BIBO stable"
+
+#plot
+T = np.linspace(0, 20, 2000)
+
+for G, name in zip(systems, names):
+    print(f"\n{name}")
+    print("Poles:", ct.poles(G))
+    print("Zeros:", ct.zeros(G))
+    print("Verdict:", bibo_verdict(G))
+
+    # Pole–Zero Map
+    ct.pzmap(G, plot=True, grid=True)
+    plt.title(f"Pole–Zero Map {name}")
+    plt.axvline(0, color="k", linestyle="--", linewidth=0.8)  # imaginary axis
+    plt.show()
+
+    #Impulse response
+    T_imp, y_imp = ct.impulse_response(G, T=T)
+    plt.figure()
+    plt.plot(T_imp, np.squeeze(y_imp))
+    plt.xlabel("t")
+    plt.ylabel("Impulse response")
+    plt.title(f"Impulse Response {name}")
+    plt.grid(True)
+    plt.show()
+
+    #Step response
+    T_step, y_step = ct.step_response(G, T=T)
+    plt.figure()
+    plt.plot(T_step, np.squeeze(y_step))
+    plt.xlabel("t")
+    plt.ylabel("Step response")
+    plt.title(f"Step Response {name}")
+    plt.grid(True)
+    plt.show()
+
