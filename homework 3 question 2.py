@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 import d2c
 
 #Model Parameters
-R_1=120_000_00 #Pa*s/m^3
+R_1=12_000_000 #Pa*s/m^3
 R_2=105_000_000 #Pa*s/m^3
 C=4.5*10**-9 #m^3/Pa
 m=8 #kg
@@ -197,6 +197,7 @@ td_ID_test, yd_ID_test = ct.forced_response(Pd_ID, t_test, u_test)
 
 # Compute error
 e = yd_ID_test  - y_test
+print(e)
 
 # Compute %VAF
 VAF_test = (1 - np.var(e)/np.var(y_test)) * 100
@@ -240,4 +241,3 @@ fig.tight_layout()
 # %%
 # Show plots
 plt.show()
-
