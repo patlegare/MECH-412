@@ -78,21 +78,41 @@ ax.set_ylabel(r'$P_{\rm rms} / P_{\rm ref}$')
 # Plot PSD
 # ##### Modify code Start ######
 
-# Compute PSD here
-y_psd = np.sin(t * 2 * np.pi) + 2  # dummy data, delete this!
+# Remove DC offset if any
+y = Prms / Pref
+y = y - np.mean(y)
 
-# These variable are to plot vertical lines
-N_lines = np.arange(2, 7, 1)
-y_psd_min = y_psd[f_low_index[-1]:f_high_index[0]].min()
-y_psd_max = y_psd[f_low_index[-1]:f_high_index[0]].max()
+# Compute PSD (Welch method)
+f_welch, Pxx = signal.welch(
+    y, fs=fs, window='hann', nperseg=2**14, noverlap=2**13, scaling='density'
+)
 
-# Plot PSD
+# Select frequency range from 100 Hz to 20,000 Hz
+mask = (f_welch >= 100) & (f_welch <= 20000)
+f_plot = f_welch[mask]
+Pxx_plot = Pxx[mask]
+
+# Determine y-axis limits for the vertical reference lines
+y_psd_min = np.min(Pxx_plot)
+y_psd_max = np.max(Pxx_plot)
+
+# Plot PSD (log–log scale)
 fig, ax = plt.subplots(figsize=(height * gr, height))
-ax.loglog([BPF, BPF], [y_psd_min, y_psd_max], color='C3')
-ax.loglog([BPF * N_lines[0], BPF * N_lines[0]], [y_psd_min, y_psd_max], color='C2')
-ax.loglog(f[f_low_index[-1]:f_high_index[0]], y_psd[f_low_index[-1]:f_high_index[0]], color='C0')
+ax.loglog(f_plot, Pxx_plot, color='C0', label="PSD of $y(t)$")
+
+# Plot the blade passing frequency and harmonics
+harmonics = np.arange(1, 7)
+for n in harmonics:
+    ax.loglog([BPF * n, BPF * n], [y_psd_min, y_psd_max],
+              color='C3' if n == 1 else 'C2',
+              linestyle='--', linewidth=1.2)
+
+# Labels and formatting
 ax.set_xlabel(r'$f$ (Hz)')
-ax.set_ylabel(r'PSD ($(P_{\rm rms} / P_{\rm ref})^2$/Hz)')
+ax.set_ylabel(r'PSD $\left[(P_{\rm rms}/P_{\rm ref})^2/{\rm Hz}\right]$')
+ax.set_title("Power Spectral Density of Propeller Acoustic Signal")
+ax.legend()
+ax.grid(which='both', linestyle='--', linewidth=0.5)
 # fig.savefig('PSD_vs_f.pdf')
 
 # ##### Modify code End ######
