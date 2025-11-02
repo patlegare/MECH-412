@@ -100,23 +100,24 @@ y_psd_max = np.max(Pxx_plot)
 fig, ax = plt.subplots(figsize=(height * gr, height))
 ax.loglog(f_plot, Pxx_plot, color='C0', label="PSD of $y(t)$")
 
-# Plot the blade passing frequency and harmonics
-harmonics = np.arange(1, 7)
-for n in harmonics:
-    ax.loglog([BPF * n, BPF * n], [y_psd_min, y_psd_max],
-              color='C3' if n == 1 else 'C2',
-              linestyle='--', linewidth=1.2)
+#blade passing frequency
+ax.loglog([BPF, BPF], [y_psd_min, y_psd_max],
+          color='C3', linestyle='--', linewidth=1.5, label='BPF (650 Hz)')
 
+# Plot harmonics
+for n in [2, 3, 4, 5, 6]:
+    f_h = n * BPF
+    if 100 <= f_h <= 20000:
+        ax.loglog([f_h, f_h], [y_psd_min, y_psd_max],
+                  color='C2', linestyle='--', linewidth=1.2)
 # Labels and formatting
 ax.set_xlabel(r'$f$ (Hz)')
-ax.set_ylabel(r'PSD $\left[(P_{\rm rms}/P_{\rm ref})^2/{\rm Hz}\right]$')
+ax.set_ylabel(r'PSD $\left[(P_{\mathrm{rms}}/P_{\mathrm{ref}})^2/\mathrm{Hz}\right]$')
 ax.set_title("Power Spectral Density of Propeller Acoustic Signal")
 ax.legend()
 ax.grid(which='both', linestyle='--', linewidth=0.5)
 # fig.savefig('PSD_vs_f.pdf')
 
-# ##### Modify code End ######
-
-# %%
+# %% Show all plots
 plt.show()
 
