@@ -1,6 +1,5 @@
 import numpy as np
 import control as ct
-from scipy import signal
 from matplotlib import pyplot as plt
 import pathlib
 import d2c
