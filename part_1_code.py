@@ -2,16 +2,15 @@ import numpy as np
 import control as ct
 from matplotlib import pyplot as plt
 import pathlib
-import d2c  # ← your Forbes d2c.py file
+import d2c 
+import unc_bound
 
 # plot styling
 plt.rc('lines', linewidth=2)
 plt.rc('axes', grid=True)
 plt.rc('grid', linestyle='--')
 
-# ---------------------------
-# helpers / metrics
-# ---------------------------
+#metrics
 def normalize(z):
     # normalize signal to [-1, 1]
     z_min, z_max = np.min(z), np.max(z)
@@ -22,7 +21,6 @@ def normalize(z):
     return a * z + b, (a, b)
 
 def fit_ratio(y, yhat):
-    # common "FIT" (%): 100*(1 - ||y - yhat|| / ||y - mean(y)||)
     num = np.linalg.norm(y - yhat)
     den = np.linalg.norm(y - np.mean(y))
     return 100.0 * (1.0 - num / (den + 1e-12))
@@ -32,13 +30,8 @@ def vaf(y, yhat):
     return 100.0 * (1.0 - np.var(e) / (np.var(y) + 1e-12))
 
 def build_A_b_causal(u, y, na, nb, nk=0):
-    """
-    Causal ARX builder (SISO):
-      y[k] + a1*y[k-1] + ... + a_na*y[k-na] = b0*u[k-nk] + ... + b_nb*u[k-nk-nb]
-    Returns A, b so that A @ x ≈ b with x = [a1..a_na, b0..b_nb].
-    """
     N = len(y)
-    k0 = max(na, nb + nk)  # first usable index
+    k0 = max(na, nb + nk)
     rows = N - k0
     A = np.zeros((rows, na + nb + 1))
     bvec = np.zeros(rows)
@@ -50,9 +43,7 @@ def build_A_b_causal(u, y, na, nb, nk=0):
         r += 1
     return A, bvec
 
-# ---------------------------
-# load all IO data
-# ---------------------------
+#load all IO data
 path = pathlib.Path('PRBS_DATA/')
 all_files = sorted(path.glob("*.csv"))
 data = [
@@ -77,15 +68,11 @@ for k in range(len(data)):
     plt.tight_layout()
     plt.show()
 
-# ---------------------------
-# model orders (ARX: na, nb, nk)
-# ---------------------------
-na, nb, nk = 3, 2, 0   # ← 3 poles, 2 zeros (b0,b1), no input delay
+# model order
+na, nb, nk = 3, 2, 0   # 3 poles, 2 zeros (b0,b1),
 models = []
 
-# ---------------------------
-# IDENTIFICATION LOOP
-# ---------------------------
+# identify
 for k in range(len(data)):
     arr = data[k]
     t = arr[:, 0]
@@ -227,10 +214,7 @@ ax[2].set_xlabel("Time (s)")
 plt.tight_layout()
 plt.show()
 
-# ---------------------------
-# UNCERTAINTY BOUND
-# ---------------------------
-import unc_bound
+#uncertainty bound
 w_shared = np.logspace(-1, 3, 600)
 f_shared = w_shared / (2 * np.pi)
 
