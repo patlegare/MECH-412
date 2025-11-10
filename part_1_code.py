@@ -258,13 +258,13 @@ nominal_idx = 3
 P_nom = models[nominal_idx]['P_s']
 P_off = [models[i]['P_s'] for i in [0, 1, 2]]
 
-# ---- Step 1. Residuals (Rk(s) = Pk/Pnom - 1) ----------------
+#Residuals (Rk(s) = Pk/Pnom - 1)
 R = unc_bound.residuals(P_nom, P_off)
 
-# ---- Step 2. Max residual magnitude --------------------------
+# Max residual magnitude
 mag_max_dB, mag_max_abs = unc_bound.residual_max_mag(R, w_shared)
 
-# ---- Step 3. Optimal bound W2(s) ------------------------------
+#Optimal bound W2(s)
 nW2 = 2  # degree of fit
 W2 = unc_bound.upperbound(omega=w_shared,
                           upper_bound=mag_max_abs,
@@ -272,7 +272,7 @@ W2 = unc_bound.upperbound(omega=w_shared,
 W2 = ct.minreal(W2, verbose=False)
 print(f"Optimal W2(s): {W2}")
 
-# ---- Step 4. Plots in Hz --------------------------------------
+# Plots in Hz
 plt.figure(figsize=(8, 6))
 for i, P in enumerate([P_nom] + P_off):
     mag, _, _ = ct.frequency_response(P, w_shared)
