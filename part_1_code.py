@@ -206,3 +206,84 @@ ax[2].set_ylabel("% Rel. Err.")
 ax[2].set_xlabel("Time (s)")
 plt.tight_layout()
 plt.show()
+
+import numpy as np
+import control as ct
+from matplotlib import pyplot as plt
+from scipy.optimize import curve_fit
+
+# Frequency grid (rad/s) — wide enough to capture system dynamics
+w = np.logspace(-1, 3, 500)   # 0.1 → 1000 rad/s
+f = w / (2 * np.pi)           # convert to Hz for plotting
+
+# ---- Choose nominal model (best or average) ----
+# Here we simply use the first model as nominal; adjust if needed
+nominal_idx = 0
+P_nom = models[nominal_idx]['P_s']
+
+# ---- Compute residuals R_k(s) = P_k(s)/P_nom(s) - 1 ----
+residuals = []
+mag_max = np.zeros_like(w)
+
+for k, m in enumerate(models):
+    Pk = m['P_s']
+    Rk = ct.minreal(Pk / P_nom - 1, verbose=False)
+    mag, phase, _ = ct.bode(Rk, w, Plot=False)
+    mag_abs = np.abs(mag)
+    mag_max = np.maximum(mag_max, mag_abs)
+    residuals.append({'k': k, 'Rk': Rk, 'mag': mag_abs})
+
+# ---- Plot nominal and off-nominal Bode magnitudes (Hz) ----
+plt.figure(figsize=(8, 6))
+for k, m in enumerate(models):
+    mag, phase, _ = ct.bode(m['P_s'], w, Plot=False)
+    plt.semilogx(f, 20 * np.log10(mag), label=f"P{s}" if k == nominal_idx else f"P{k}")
+plt.title("Nominal and Off-Nominal Plant Magnitudes")
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude (dB)")
+plt.grid(True, which='both')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+# ---- Plot residual magnitudes |R_k(jω)| (Hz) ----
+plt.figure(figsize=(8, 6))
+for r in residuals:
+    plt.semilogx(f, 20 * np.log10(r['mag']), label=f"R{r['k']}")
+plt.semilogx(f, 20 * np.log10(mag_max), 'k--', linewidth=2, label="Upper envelope")
+plt.title("Residual Magnitudes |R_k(jω)|")
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude (dB)")
+plt.legend()
+plt.grid(True, which='both')
+plt.tight_layout()
+plt.show()
+
+# ---- Fit upper bound W2(s) to envelope ----
+nW2 = 2  # order of fit (can justify this in report)
+
+def w2_mag_model(w, b0, b1, a0, a1):
+    s = 1j * w
+    num = b0 * s + b1
+    den = s**2 + a0 * s + a1
+    return np.abs(num / den)
+
+# Fit magnitude envelope
+popt, _ = curve_fit(w2_mag_model, w, mag_max, p0=[1, 1, 10, 1])
+b0, b1, a0, a1 = popt
+W2 = ct.TransferFunction([b0, b1], [1, a0, a1])
+
+# ---- Plot W2 vs residual envelope (Hz) ----
+mag_W2, _, _ = ct.bode(W2, w, Plot=False)
+plt.figure(figsize=(8, 6))
+plt.semilogx(f, 20 * np.log10(mag_max), 'k--', linewidth=2, label="Residual envelope")
+plt.semilogx(f, 20 * np.log10(mag_W2), 'r', linewidth=2, label=f"|W₂(jω)| fit (n={nW2})")
+plt.title("W₂(s) Upper-Bound Fit (Frequency in Hz)")
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude (dB)")
+plt.legend()
+plt.grid(True, which='both')
+plt.tight_layout()
+plt.show()
+
+print(f"\nIdentified W2(s): {W2}")
