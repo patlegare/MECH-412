@@ -1,8 +1,10 @@
 import numpy as np
 import control as ct
+from scipy import signal
 from matplotlib import pyplot as plt
 import pathlib
 import d2c
+from scipy.optimize import minimize
 
 #plot styling
 plt.rc('lines', linewidth=2)
@@ -67,8 +69,42 @@ def build_A_b(u, y, n, m):
         b.append(y[k])
     return np.array(A), np.array(b)
 
+def fit_to_order(P_d, n, m):
+    T = P_d.dt
+    omega = np.logspace(-1, np.log10(np.pi / T), 100)
+    resp = ct.frequency_response(P_d, omega)[0]
+
+    def cost(params):
+        num = params[:m+1]
+        den = [1.0] + params[m+1:]
+        try:
+            P = ct.TransferFunction(num, den)
+            resp_p = ct.frequency_response(P, omega)[0]
+            return np.sum(np.abs(resp_p - resp)**2)
+        except:
+            return 1e10
+
+    # Initial guess from d2c
+    P_init = d2c.d2c(P_d)
+    num_init = P_init.num[0][0][- (m+1):]
+    if len(num_init) < m+1:
+        num_init = np.pad(num_init, (m+1 - len(num_init), 0))
+    den_init = P_init.den[0][0][1:]
+    if len(den_init) < n:
+        den_init = np.pad(den_init, (n - len(den_init), 0))
+    elif len(den_init) > n:
+        den_init = den_init[:n]
+    params_init = np.concatenate((num_init, den_init))
+
+    res = minimize(cost, params_init, method='nelder-mead', options={'maxiter': 2000})
+    params = res.x
+    num = params[:m+1]
+    den = [1.0] + params[m+1:]
+    P_s = ct.TransferFunction(num, den)
+    return ct.minreal(P_s)
+
 #set model order
-n, m = 2, 1
+n, m = 3, 2
 
 #storage for models
 models = []
@@ -111,7 +147,8 @@ for k in range(len(data)):
     print(f"P(z): {P_d}")
 
     # Convert to continuous-time using exact logm-based d2c (J.R. Forbes method)
-    P_s = d2c.d2c(P_d)
+    P_s_init = d2c.d2c(P_d)
+    P_s = fit_to_order(P_d, n, m)
     print(f"P(s): {P_s}")   
     
     #fit quality
@@ -210,80 +247,57 @@ plt.show()
 import numpy as np
 import control as ct
 from matplotlib import pyplot as plt
-from scipy.optimize import curve_fit
+import unc_bound  # Forbes–Dahdah–Eid 2025 module
 
-# Frequency grid (rad/s) — wide enough to capture system dynamics
-w = np.logspace(-1, 3, 500)   # 0.1 → 1000 rad/s
-f = w / (2 * np.pi)           # convert to Hz for plotting
+# Frequency grid (rad/s) and conversion to Hz
+w_shared = np.logspace(-1, 3, 600)
+f_shared = w_shared / (2 * np.pi)
 
-# ---- Choose nominal model (best or average) ----
-# Here we simply use the first model as nominal; adjust if needed
-nominal_idx = 0
+# Nominal = dataset 3, Off-nominal = datasets 0–2
+nominal_idx = 3
 P_nom = models[nominal_idx]['P_s']
+P_off = [models[i]['P_s'] for i in [0, 1, 2]]
 
-# ---- Compute residuals R_k(s) = P_k(s)/P_nom(s) - 1 ----
-residuals = []
-mag_max = np.zeros_like(w)
+# ---- Step 1. Residuals (Rk(s) = Pk/Pnom - 1) ----------------
+R = unc_bound.residuals(P_nom, P_off)
 
-for k, m in enumerate(models):
-    Pk = m['P_s']
-    Rk = ct.minreal(Pk / P_nom - 1, verbose=False)
-    mag, phase, _ = ct.bode(Rk, w, Plot=False)
-    mag_abs = np.abs(mag)
-    mag_max = np.maximum(mag_max, mag_abs)
-    residuals.append({'k': k, 'Rk': Rk, 'mag': mag_abs})
+# ---- Step 2. Max residual magnitude --------------------------
+mag_max_dB, mag_max_abs = unc_bound.residual_max_mag(R, w_shared)
 
-# ---- Plot nominal and off-nominal Bode magnitudes (Hz) ----
+# ---- Step 3. Optimal bound W2(s) ------------------------------
+nW2 = 2  # degree of fit
+W2 = unc_bound.upperbound(omega=w_shared,
+                          upper_bound=mag_max_abs,
+                          degree=nW2)
+W2 = ct.minreal(W2, verbose=False)
+print(f"Optimal W2(s): {W2}")
+
+# ---- Step 4. Plots in Hz --------------------------------------
 plt.figure(figsize=(8, 6))
-for k, m in enumerate(models):
-    mag, phase, _ = ct.bode(m['P_s'], w, Plot=False)
-    plt.semilogx(f, 20 * np.log10(mag), label=f"P{s}" if k == nominal_idx else f"P{k}")
+for i, P in enumerate([P_nom] + P_off):
+    mag, _, _ = ct.frequency_response(P, w_shared)
+    lbl = f"Dataset {i}" if i != 0 else "Nominal (IO_3)"
+    plt.semilogx(f_shared, 20*np.log10(mag), label=lbl)
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude (dB)")
 plt.title("Nominal and Off-Nominal Plant Magnitudes")
-plt.xlabel("Frequency (Hz)")
-plt.ylabel("Magnitude (dB)")
-plt.grid(True, which='both')
-plt.legend()
-plt.tight_layout()
-plt.show()
+plt.legend(); plt.grid(True, which="both"); plt.tight_layout(); plt.show()
 
-# ---- Plot residual magnitudes |R_k(jω)| (Hz) ----
 plt.figure(figsize=(8, 6))
-for r in residuals:
-    plt.semilogx(f, 20 * np.log10(r['mag']), label=f"R{r['k']}")
-plt.semilogx(f, 20 * np.log10(mag_max), 'k--', linewidth=2, label="Upper envelope")
-plt.title("Residual Magnitudes |R_k(jω)|")
+for i, r in enumerate(R):
+    mag, _, _ = ct.frequency_response(r, w_shared)
+    plt.semilogx(f_shared, 20*np.log10(mag), label=f"R{i+1}")
+plt.semilogx(f_shared, mag_max_dB, "k--", lw=2, label="Upper envelope")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Magnitude (dB)")
-plt.legend()
-plt.grid(True, which='both')
-plt.tight_layout()
-plt.show()
+plt.title("Residual Magnitudes |Rₖ(jω)|")
+plt.legend(); plt.grid(True, which="both"); plt.tight_layout(); plt.show()
 
-# ---- Fit upper bound W2(s) to envelope ----
-nW2 = 2  # order of fit (can justify this in report)
-
-def w2_mag_model(w, b0, b1, a0, a1):
-    s = 1j * w
-    num = b0 * s + b1
-    den = s**2 + a0 * s + a1
-    return np.abs(num / den)
-
-# Fit magnitude envelope
-popt, _ = curve_fit(w2_mag_model, w, mag_max, p0=[1, 1, 10, 1])
-b0, b1, a0, a1 = popt
-W2 = ct.TransferFunction([b0, b1], [1, a0, a1])
-
-# ---- Plot W2 vs residual envelope (Hz) ----
-mag_W2, _, _ = ct.bode(W2, w, Plot=False)
+mag_W2, _, _ = ct.frequency_response(W2, w_shared)
 plt.figure(figsize=(8, 6))
-plt.semilogx(f, 20 * np.log10(mag_max), 'k--', linewidth=2, label="Residual envelope")
-plt.semilogx(f, 20 * np.log10(mag_W2), 'r', linewidth=2, label=f"|W₂(jω)| fit (n={nW2})")
-plt.title("W₂(s) Upper-Bound Fit (Frequency in Hz)")
+plt.semilogx(f_shared, mag_max_dB, "k--", lw=2, label="Residual envelope")
+plt.semilogx(f_shared, 20*np.log10(mag_W2), "r", lw=2, label="|W₂(jω)| fit")
 plt.xlabel("Frequency (Hz)")
 plt.ylabel("Magnitude (dB)")
-plt.legend()
-plt.grid(True, which='both')
-plt.tight_layout()
-plt.show()
-
-print(f"\nIdentified W2(s): {W2}")
+plt.title("Optimal Uncertainty Weight W₂(s)")
+plt.legend(); plt.grid(True, which="both"); plt.tight_layout(); plt.show()
