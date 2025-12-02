@@ -64,11 +64,6 @@ m = 1  # kg
 d = 2  # N s / m
 P = g / (m * s**2 + d * s)
 
-# W2, uncertainty weight
-W2_num = np.array([1.01097854e+00, 3.03303632e+01, 3.43858706e+02, 1.09902748e+03, 1.05325567e+03])
-W2_den = np.array([1.00000000e+00, 2.75243287e+01, 3.53177231e+02, 1.66166012e+03, 2.52102297e+03])
-W2 = control.tf(W2_num, W2_den)
-W2_inv = 1 / W2
 
 # Off nominal plants sampled from W2 where \Delta is a real number less than one.
 N_off_nom = 10
