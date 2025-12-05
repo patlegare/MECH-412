@@ -7,7 +7,7 @@ James Forbes
 # Packages
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy import integrate
+from scipy import integrate, fft
 from scipy import signal
 import control
 
@@ -243,6 +243,21 @@ t = t_raw[t_start_index:t_end_index]
 
 # Extract temperature data over the desired interval. 
 temp_raw = temp_raw_raw[t_start_index:t_end_index]
+
+fs = 1 / dt
+
+# Compute frequencies
+
+f, Pxx = signal.periodogram(temp_raw_raw, fs=fs, scaling='density')
+
+plt.figure(figsize=(8,5))
+plt.semilogy(f, Pxx)
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('PSD')
+plt.title('Power Spectral Density ')
+plt.grid(True, which='both', linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.show()
 
 # Plotting
 # Plot raw data time domain
