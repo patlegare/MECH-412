@@ -224,11 +224,7 @@ data = np.loadtxt(
 # Extract time and temperature data
 N_temp_data = data.shape[0]
 dt = 0.02
-
-# Must specify time, because the data has some numerical rounding issues. 
 t_raw = np.linspace(0, dt * N_temp_data, N_temp_data)
-
-# All the temperatures
 temp_raw_raw = data[:, 1]
 
 # Extract a subset of time 
@@ -244,61 +240,83 @@ t = t_raw[t_start_index:t_end_index]
 # Extract temperature data over the desired interval. 
 temp_raw = temp_raw_raw[t_start_index:t_end_index]
 
-fs = 1 / dt
+# 3. Calculate Max Flow Rate (Q_max)
+# We use the DC gain of the identified plant P(s) and the max voltage (5V)
+max_V = 5.0 # 
+max_LPM = P.dcgain() * max_V 
+print(f"Calculated Max Flow Rate (Q_max): {max_LPM:.4f} LPM")
 
-# Compute frequencies
+# 4. Compute r_raw (Unfiltered Reference)
+# Map Temperature [40, 90]: Flow [0, Q_max]
+T_min = 40.0 # 
+T_max = 90.0 # 
 
-f, Pxx = signal.periodogram(temp_raw_raw, fs=fs, scaling='density')
+# Linear interpolation formula
+r_raw_tilde = (temp_raw - T_min) / (T_max - T_min) * max_LPM
 
-plt.figure(figsize=(8,5))
+# Saturation: Ensure flow doesn't go below 0 or above max_LPM
+r_raw_tilde = np.clip(r_raw_tilde, 0, max_LPM)
+
+# 5. Frequency Analysis (Finding f_r)
+fs = 1 / dt # Sampling frequency (50Hz)
+f, Pxx = signal.periodogram(r_raw_tilde, fs=fs, scaling='density')
+
+plt.figure(figsize=(8, 5))
 plt.semilogy(f, Pxx)
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('PSD')
-plt.title('Power Spectral Density ')
+
+# 1. Update Labels and Title with fontsize and fontweight
+plt.xlabel('Frequency (Hz)', fontsize=14, fontweight='bold')
+plt.ylabel('PSD (LPM^2/Hz)', fontsize=14, fontweight='bold')
+plt.title('Power Spectral Density of Desired Flow Rate', fontsize=16, fontweight='bold')
+
 plt.grid(True, which='both', linestyle='--', alpha=0.5)
+plt.xlim([0, 25]) # Focus on low frequencies 
+
+# 2. Update Axis Numbers
+ax = plt.gca() # Get current axis
+ax.tick_params(axis='both', which='major', labelsize=12) # Make numbers bigger
+
+# Loop through tick labels to make them bold
+for label in ax.get_xticklabels() + ax.get_yticklabels():
+    label.set_fontweight('bold')
+
 plt.tight_layout()
 plt.show()
 
-# Plotting
-# Plot raw data time domain
-fig, ax = plt.subplots()
-fig.set_size_inches(height * gr, height, forward=True)
-ax.plot(t, temp_raw)
-ax.set_xlabel(r'$t$ (s)')
-ax.set_ylabel(r'Temperature (°C)')
-fig.tight_layout()
-# fig.savefig('x.pdf')
+print("Analyze the PSD plot above.")
+print("Identify the frequency where the signal magnitude drops significantly.")
+print("This 'corner' is your bandwidth f_r.")
 
-temp_raw_max = np.max(np.abs(temp_raw))
-temp_raw_min = np.min(np.abs(temp_raw))
-print("The max (in absolute value) output is", temp_raw_max, '(°C)')
-print("The min (in absolute value) output is", temp_raw_min, '(°C)')
+# 6. Filter the Reference (Determine r(t))
+# YOU MUST UPDATE THIS VALUE based on the PSD plot analysis!
+# For example, if the plot drops off around 0.05 Hz, set w_r_h_Hz = 0.05
+w_r_h_Hz = 0.05 # [TODO: REPLACE WITH YOUR IDENTIFIED FREQUENCY]
 
-# Round the max up to 90 C
-temp_raw_max = 90  # C
+# Convert to rad/s for the filter
+w_r_h = Hz2rps(w_r_h_Hz) 
+print(f"Selected cutoff frequency f_r: {w_r_h_Hz} Hz")
+print(f"Selected cutoff frequency w_r: {w_r_h:.4f} rad/s")
 
-# Extract temperature data 
-temp_raw = temp_raw_raw[t_start_index:t_end_index]
-
-# Convert temp into a reference LPM
-# You must change this!
-r_raw_tilde = (temp_raw - temp_raw_min) * 0.3
-# Now filter using w_r_h
+# Apply Low-Pass Filter
+# Transfer function: 1 / ((1/a)s + 1) where a = w_r
 a = w_r_h
-_, r_tilde = control.forced_response(1 / (1 / a * s + 1), t, r_raw_tilde, 0)
+# initial_value set to r_raw_tilde[0] to avoid startup transient
+_, r = control.forced_response(1 / (1 / a * s + 1), t, r_raw_tilde, X0=r_raw_tilde[0])
 
-r_raw = r_raw_tilde  # r_raw would be unfiltered, without units, if you did some normalization
-r = r_tilde  # r would be filtered, without units, if you did some normalization
-
-fig, ax = plt.subplots()
+# 7. Plot r(t) vs r_raw
+fig, ax = plt.subplots(figsize=(10, 5))
 ax.set_xlabel(r'$t$ (s)')
-ax.set_ylabel(r'$r(t)$ (LPM)')
-# Plot data
-ax.plot(t, r, '--', label='$r(t)$', color='C3')
-ax.legend(loc='upper right')
+ax.set_ylabel(r'Flow Rate (LPM)')
+ax.plot(t, r_raw_tilde, 'k--', alpha=0.4, label=r'$r_{raw}(t)$ (Unfiltered)')
+ax.plot(t, r, 'r-', linewidth=2, label=r'$r(t)$ (Filtered)')
+ax.legend(loc='upper left')
+ax.set_title(f'Reference Generation (Filter Cutoff: {w_r_h_Hz} Hz)')
 fig.tight_layout()
 plt.show()
-# fig.savefig('x.pdf')
+
+# Assign final variables for simulation
+r_raw = r_raw_tilde 
+# r is already assigned above
 
 # Noise
 np.random.seed(123321)

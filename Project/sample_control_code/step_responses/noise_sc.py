@@ -6,13 +6,8 @@ J R Forbes, 2025/09/10
 # %%
 # Libraries
 import numpy as np
-# import control
-# from scipy import signal
 from matplotlib import pyplot as plt
-# from scipy import fft
-# from scipy import integrate
 import pathlib
-
 
 # %%
 # Plotting parameters
@@ -38,9 +33,13 @@ height = 4.25
 
 # %%
 # Read in all input-output (IO) data
-path = pathlib.Path('DATA_noise/')
+# ENSURE YOUR CSV FILES ARE IN A FOLDER NAMED "DATA_noise"
+path = pathlib.Path('DATA_noise/') 
 all_files = sorted(path.glob("*.csv"))
-# all_files.sort()
+
+if not all_files:
+    print("Warning: No files found in DATA_noise folder.")
+
 data = [
     np.loadtxt(
         filename,
@@ -48,49 +47,65 @@ data = [
         delimiter=',',
         skiprows=1,
         usecols=(0, 1, 2),
-        # max_rows=1100,
     ) for filename in all_files
 ]
-data = np.array(data)
+# Convert list to array (careful if files have different lengths, this might fail)
+# If files have different lengths, keep 'data' as a list.
+# data = np.array(data) 
 
 # %%
-# 
+# Process Data
+N_data = len(data)
+noise_stds = []
 
-N_data = data.shape[0]
-max_input_output_std = np.zeros((N_data, 7))
-
-for i in range(N_data): # N_data
+for i in range(N_data):
     # Data
-    data_read = data[i, :, :]
+    data_read = data[i]
 
-    t_full = data_read[:, 0]
-    target_time = 0  # s
-    t_start_index = np.argmin(np.abs(t_full - target_time))
-
-    # Extract time
-    t = data_read[t_start_index:-1, 0]
-    # N = t.size
-    T = t[1] - t[0]
-
+    t = data_read[:, 0]
+    
     # Extract input and output
-    u_raw = data_read[t_start_index:-1, 1]  # V, volts
-    y_raw = data_read[t_start_index:-1, 2]  # LMP, force
+    u_raw = data_read[:, 1]  # V, volts
+    y_raw = data_read[:, 2]  # LPM, flow rate
 
-    # Plotting
-    # Plot raw data time domain
+    # --- NEW: Calculate Noise Statistics ---
+    # We assume the last 50% of the data is steady state
+    idx_steady = int(len(y_raw) * 0.5)
+    y_steady = y_raw[idx_steady:]
+    
+    # Calculate Standard Deviation for this dataset
+    std_val = np.std(y_steady)
+    noise_stds.append(std_val)
+    
+    print(f"File {all_files[i].name}: Std Dev = {std_val:.4f} LPM")
+
+    # --- Plotting (Your original code) ---
     fig, ax = plt.subplots(2, 1)
     fig.set_size_inches(height * gr, height, forward=True)
     ax[0].plot(t, u_raw)
     ax[1].plot(t, y_raw)
+    
+    # Visualize the steady state region
+    ax[1].plot(t[idx_steady:], y_steady, 'r--', label='Steady State')
+    ax[1].legend()
+
     ax[0].set_xlabel(r'$t$ (s)')
     ax[1].set_xlabel(r'$t$ (s)')
     ax[0].set_ylabel(r'$\tilde{u}(t)$ (V)')
     ax[1].set_ylabel(r'$\tilde{y}(t)$ (LPM)')
+    ax[0].set_title(f'Dataset {i+1} (Noise $\sigma = {std_val:.3f}$)')
     fig.tight_layout()
-    # fig.savefig('x.pdf')
+    # fig.savefig(f'noise_plot_{i}.pdf')
 
-
-
-
+    plt.show()
 
 # %%
+# Final Result
+if noise_stds:
+    sigma_n = np.max(noise_stds)
+    print("\n" + "="*30)
+    print(f"Maximum calculated sigma_n: {sigma_n:.4f} LPM")
+    print("="*30)
+else:
+    print("No data processed.")
+    sigma_n = 0.0 # Default fallback
