@@ -84,15 +84,13 @@ P_off_nom = [P * (1 + W2 * Delta[i]) for i in range(len(Delta))]
 # %%
 # Performance
 
-# Dummy values. You must change everything here!
-
-w_r_h_Hz = 0.5  # Hz
+w_r_h_Hz = 0.1  # Hz
 
 # Noise and reference bounds
-gamma_n, w_n_l = 1, Hz2rps(w_r_h_Hz * 100)
-gamma_r, w_r_h = 1, Hz2rps(w_r_h_Hz)
-gamma_u, w_u_l = 1, w_r_h
-gamma_d, w_d_h = 1, w_r_h / 10
+gamma_n, w_n_l = 1.0, 15.7  
+gamma_r, w_r_h = 0.05, 0.628 
+gamma_u, w_u_l = 10**(9/20), 15.7 
+gamma_d, w_d_h = 0.05, 0.063 
 
 # Set up design specifications plot
 w_r = np.logspace(w_shared_low, np.log10(w_r_h), 100)
@@ -107,10 +105,10 @@ gamma_n_dB = 20 * np.log10(gamma_n) * np.ones(w_n.shape[0],)
 gamma_u_dB = 20 * np.log10(gamma_u) * np.ones(w_u.shape[0],)
 
 # Weight W_1(s) according to Zhou et al.
-k = 2
-epsilon = 10**(-30 / 20)
-M1 = 10**(5 / 20)
-w1 = Hz2rps(w_r_h_Hz + 0.2)
+k = 1
+epsilon = 0.05 #around 10^(-26/20)
+M1 = 2     # around 10**(6 / 20)
+w1 = 0.7
 W1 = ((s / M1**(1 / k) + w1) / (s + w1 * (epsilon)**(1 / k)))**k
 W1_inv = 1 / W1
 
@@ -287,10 +285,8 @@ print("Analyze the PSD plot above.")
 print("Identify the frequency where the signal magnitude drops significantly.")
 print("This 'corner' is your bandwidth f_r.")
 
-# 6. Filter the Reference (Determine r(t))
-# YOU MUST UPDATE THIS VALUE based on the PSD plot analysis!
-# For example, if the plot drops off around 0.05 Hz, set w_r_h_Hz = 0.05
-w_r_h_Hz = 0.05 # [TODO: REPLACE WITH YOUR IDENTIFIED FREQUENCY]
+# 6. Filter the Reference
+w_r_h_Hz = 0.1 
 
 # Convert to rad/s for the filter
 w_r_h = Hz2rps(w_r_h_Hz) 
