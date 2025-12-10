@@ -90,6 +90,7 @@ gamma_r, w_r_h = 0.05, 0.628
 gamma_u, w_u_l = 10**(9/20), 15.7 
 gamma_d, w_d_h = 0.05, 0.063 
 
+
 # Set up design specifications plot
 w_r = np.logspace(w_shared_low, np.log10(w_r_h), 100)
 w_d = np.logspace(w_shared_low, np.log10(w_d_h), 100)
@@ -130,16 +131,44 @@ ax.legend(loc='lower right')
 wmin, wmax, N_w_robust_nyq = np.log10(Hz2rps(10**(-4))), np.log10(Hz2rps(10**(4))), 1000
 count, fig, ax = srp.robust_nyq(P, P_off_nom, W2, wmin, wmax, N_w_robust_nyq)
 fig.tight_layout()
+ax.set_title("AHHH")
 # fig.savefig('x.pdf')
 
 # %%
 # Control design.
 
 # Dummy controller, you must change!
+
+
 w_c = 1
-L_des = w_c / s
+
+# tau_0 = 1/16
+# tau_1 = 1/16
+# tau_2 = 1/16
+
+# L = (w_c/s) * (1/((tau_0 * s) + 1)) * (1/((tau_1 * s) + 1)) * (1/((tau_2 * s) + 1))
+
+# tau = 1/12
+
+# L_des = (w_c / (s * (tau * s + 1)))
+
+
+# L_des = w_c / s
+
+# C = L_des / P
+# print("C = ", C, "\n")
+
+w_c = 1.5    # Set crossover frequency
+alpha_lead = 1.4
+tau_lead = 1 / w_c
+k_p = 14  # slightly higher
+
+L_des = k_p * (tau_lead * s + 1) \
+        / (alpha_lead * tau_lead * s + 1) * (1 / s)
+print("L_des=",L_des)
 
 C = L_des / P
+
 print("C = ", C, "\n")
 
 fig_L, ax = srp.bode_mag_L(P, C, gamma_r, w_r_h, gamma_n, w_n_l, w_shared_low, w_shared_high, w_shared, Hz = True)
@@ -192,6 +221,15 @@ count, contour = control.nyquist_plot(control.minreal(P * C),
 # ax_Nyquist.axis('equal')
 fig_Nyquist.tight_layout()
 
+# Robust Nyquist plot to assess robustness
+L_off_nom = [C * P * (1 + W2 * i / N_off_nom) for i in range(-N_off_nom, N_off_nom + 1, 1)]
+wmin, wmax, N_w_robust_nyq = 0.05, 2, 1000
+count, fig, ax = srp.robust_nyq(control.minreal(P * C), L_off_nom, W2, wmin, wmax, N_w_robust_nyq)
+ax.axis('equal')
+fig.tight_layout()
+ax.set_title("Test")
+# fig.savefig('figs/nyquist_L_W2.pdf')
+
 # fig_L.savefig('temp_L_C1.pdf')
 # fig_RP.savefig('RP_C1.pdf')
 # fig_RP_RD.savefig('RP_RD_C1.pdf')
@@ -202,8 +240,6 @@ fig_Nyquist.tight_layout()
 # fig_margins.savefig('temp_margins_C1.pdf')
 # fig_Gof4.savefig('temp_Gof4_C1.pdf')
 # fig_Nyquist.savefig('temp_Nyquist_C1.pdf')
-
-
 
 # %%
 # Reference
@@ -460,6 +496,7 @@ y, u, e = simulate(P, C, t, r_raw, r, noise, u_range, z_range)
 y_tilde = y
 u_tilde = u
 e_tilde = e
+r_tilde = r
 
 # Max acceptable error and control values. 
 e_nor_ref = 0.05*max_LPM
