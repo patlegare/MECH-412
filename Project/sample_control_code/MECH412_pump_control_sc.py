@@ -52,19 +52,17 @@ w_shared_2 = np.logspace(w_shared_low_2, w_shared_high_2, N_w_2)
 
 # Uncertainty weight
 # Dummy uncertainty weight! You must change!
-W2 = control.TransferFunction([1, 0.3], [1 / 0.5, 6])
+W2 = control.TransferFunction([0.8764, 7.999], [1 , 10.39])
 W2_inv = 1 / W2
 print("W_2(s) = ", W2)
 
-# Nominal model, which is NOT normalized, and has units of LPM / V.
-# Note, this is just something made up, and does NOT imply the pump is first order!
-# Dummy plant! You must change!
-m, n = 0, 1
-P_tilde = control.TransferFunction([30], [1, 10])
+# Nominal model
+m, n = 2, 3
+P_tilde = control.TransferFunction([1628,25240,102.2], [1, 36.29, 283, 1.207])
 
 DC_gain = P_tilde.dcgain()
 max_V = 5
-max_LPM = 15  # Dummy value. You must change. 
+max_LPM = DC_gain *max_V  # where P(s)=0
 
 P = P_tilde  # The ``tilde" means ``with units". This sample code has not done any normalization. 
 
@@ -104,7 +102,7 @@ gamma_d_dB = 20 * np.log10(gamma_d) * np.ones(w_d.shape[0],)
 gamma_n_dB = 20 * np.log10(gamma_n) * np.ones(w_n.shape[0],)
 gamma_u_dB = 20 * np.log10(gamma_u) * np.ones(w_u.shape[0],)
 
-# Weight W_1(s) according to Zhou et al.
+# Weight W_1(s) 
 k = 1
 epsilon = 0.05 #around 10^(-26/20)
 M1 = 2     # around 10**(6 / 20)
@@ -317,7 +315,7 @@ r_raw = r_raw_tilde
 # Noise
 np.random.seed(123321)
 noise_raw = np.random.normal(0, 1, t.shape[0])
-sigma_n = 0.25  # LPM, dummy value. You must change. 
+sigma_n = 0.15  # LPM, dummy value. You must change. 
 noise =  sigma_n * noise_raw * 1  # Change the 1 to a zero to ``turn off" noise in order to debug. 
 
 
@@ -464,7 +462,7 @@ u_tilde = u
 e_tilde = e
 
 # Max acceptable error and control values. 
-e_nor_ref = 0.56  # Dummy variable, you change
+e_nor_ref = 0.05*max_LPM
 u_nor_ref = 5  # V
 
 
