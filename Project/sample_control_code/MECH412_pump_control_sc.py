@@ -51,7 +51,6 @@ w_shared_2 = np.logspace(w_shared_low_2, w_shared_high_2, N_w_2)
 # Extract uncertainty weight and nominal model.
 
 # Uncertainty weight
-# Dummy uncertainty weight! You must change!
 W2 = control.TransferFunction([0.8764, 7.999], [1 , 10.39])
 W2_inv = 1 / W2
 print("W_2(s) = ", W2)
