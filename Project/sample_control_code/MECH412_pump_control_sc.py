@@ -143,7 +143,7 @@ ax.set_title("AHHH")
 w_c = 1.5    # Set crossover frequency
 mu = 1 / w_c
 tau = 1.5 #Set roll-off constant
-k_g = 14  # Set gaim
+k_g = 14  # Set gain
 
 #Build Loop
 L_des = k_g * (mu * s + 1) \
