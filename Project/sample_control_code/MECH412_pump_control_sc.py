@@ -63,7 +63,7 @@ DC_gain = P_tilde.dcgain()
 max_V = 5
 max_LPM = DC_gain *max_V  # where P(s)=0
 
-P = P_tilde  # The ``tilde" means ``with units". This sample code has not done any normalization. 
+P = P_tilde  # The ``tilde" means ``with units". 
 
 print("P(s) = ", P)
 N_off_nom = 10
@@ -124,20 +124,8 @@ fig.set_size_inches(height * gr, height, forward=True)
 ax.legend(loc='lower right')
 # fig.savefig('x.pdf')
 
-
 # %%
-# Nyquist of open-loop plant without control
-wmin, wmax, N_w_robust_nyq = np.log10(Hz2rps(10**(-4))), np.log10(Hz2rps(10**(4))), 1000
-count, fig, ax = srp.robust_nyq(P, P_off_nom, W2, wmin, wmax, N_w_robust_nyq)
-fig.tight_layout()
-ax.set_title("AHHH")
-# fig.savefig('x.pdf')
-
-# %%
-# Control design.
-
-# Dummy controller, you must change!
-
+# Control design
 
 w_c = 1.5    # Set crossover frequency
 mu = 1 / w_c
