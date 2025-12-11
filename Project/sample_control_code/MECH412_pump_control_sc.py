@@ -139,37 +139,21 @@ ax.set_title("AHHH")
 # Dummy controller, you must change!
 
 
-w_c = 1
-
-# tau_0 = 1/16
-# tau_1 = 1/16
-# tau_2 = 1/16
-
-# L = (w_c/s) * (1/((tau_0 * s) + 1)) * (1/((tau_1 * s) + 1)) * (1/((tau_2 * s) + 1))
-
-# tau = 1/12
-
-# L_des = (w_c / (s * (tau * s + 1)))
-
-
-# L_des = w_c / s
-
-# C = L_des / P
-# print("C = ", C, "\n")
-
 w_c = 1.5    # Set crossover frequency
-alpha_lead = 1.4
-tau_lead = 1 / w_c
-k_p = 14  # slightly higher
+mu = 1 / w_c
+tau = 1.5 #Set roll-off constant
+k_g = 14  # Set gain
 
-L_des = k_p * (tau_lead * s + 1) \
-        / (alpha_lead * tau_lead * s + 1) * (1 / s)
+#Build Loop
+L_des = k_g * (mu * s + 1) \
+        / (tau * mu * s + 1) * (1 / s)
 print("L_des=",L_des)
 
+#Back-out controller
 C = L_des / P
 
-print("C = ", C, "\n")
 
+print("C = ", C, "\n")
 fig_L, ax = srp.bode_mag_L(P, C, gamma_r, w_r_h, gamma_n, w_n_l, w_shared_low, w_shared_high, w_shared, Hz = True)
 fig_L.set_size_inches(height * gr, height, forward=True)
 ax.legend(loc='lower left')
@@ -226,7 +210,7 @@ wmin, wmax, N_w_robust_nyq = 0.05, 2, 1000
 count, fig, ax = srp.robust_nyq(control.minreal(P * C), L_off_nom, W2, wmin, wmax, N_w_robust_nyq)
 ax.axis('equal')
 fig.tight_layout()
-ax.set_title("Test")
+
 # fig.savefig('figs/nyquist_L_W2.pdf')
 
 # fig_L.savefig('temp_L_C1.pdf')
